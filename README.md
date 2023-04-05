@@ -1,7 +1,5 @@
-# jsonwentoken 
-# JWT
-
-# To Run the program - 
-# Steps - 
-#npm i
-#nodemon
+# jsonwentoken JWT
+To Run the program - 
+Steps - 
+npm i
+nodemon
