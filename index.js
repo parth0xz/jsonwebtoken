@@ -1,56 +1,88 @@
-const express = require('express')
-const app = express()
-const secretKey = 'secretKey'
-const jwt = require('jsonwebtoken')
-const user = 
-    {
-        name: 'parth',
-        password: 'user'
-    }
-function verifyToken(req,res,next)
-{
-    const bearerHeader = req.headers['authorization'];
-    if(typeof bearerHeader !== 'undefined')
-    {
-        const bearer = bearerHeader.split(" ");
-        const token = bearer[1];
-        req.token = token;
-        next();
-    }
-    else
-    {res.send({result: 'Token is not Valid'})}
-} 
+const bcrypt = require('bcrypt');
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const app = express();
+const port = 3001;
+const users = [];
 
-app.get('/',(req,res)=>{
-    console.log('route is- /')
-})
 
-app.post('/login',(req,res)=>{
-    if(user.name === 'parth')
-    {
-        const getToken =  jwt.sign({user},secretKey , { expiresIn: '1d' },(err,token) => {
-            res.send({token})
-        })
-    }
-    else{res.send({result: 'invalid username'})}
-})
-
-app.post('/profile',verifyToken,(req,res)=>{
-    jwt.verify(req.token,secretKey,(err, authData) =>{
-        if(err)
-        {
-            res.send({result: "Invalid Token"})
+app.use(express.json());
+app.listen(port, () => {
+    console.log(`app running on http://127.0.0.1:${port}`)
+});
+app.post('/register', async (req, res) => {
+    try {
+        if (users.some(user => user.email === req.body.email)) {
+            const err = new Error('Email Taken!')
+            err.status = 400;
+            throw err;
         }
-        else
-        {
-            res.json({
-                message: "profile access",
-                authData
-            })
+        const user = {
+            email: req.body.email,
+            password: await bcrypt.hash(req.body.password, 12),
         }
-    })
-})
+        users.push(user);
+        res.status(201).json({
+            status: 'success',
+            message: 'User Registered!',
+            data: {
+                user: {
+                    email: user.email,
+                },
+            },
+        });
+    } catch (err) {
+        res.status(err.status).json({
+            status: 'fail',
+            message: err.message,
+        });
+    }
+});
 
-app.listen(3000,()=>{
-    console.log('API App is running on 3000')
-})
+
+
+app.post('/login', async (req, res) => {
+    try {
+        const user = users.find(user => user.email === req.body.email);
+        if (!user) {
+            const err = new Error('User Not Found!')
+            err.status = 400;
+            throw err;
+        } else if (await bcrypt.compare(req.body.password, user.password)) {
+            const tokenPayload = {
+                email: user.email,
+            };
+            const accessToken = jwt.sign(tokenPayload, 'SECRET');
+            res.status(201).json({
+                status: 'success',
+                message: 'User Logged In!',
+                data: {
+                    accessToken,
+                },
+            });
+        } else {
+            const err = new Error('Wrong Password!');
+            err.status = 400;
+            throw err;
+        }
+    } catch (err) {
+        res.status(err.status).json({
+            status: 'fail',
+            message: err.message,
+        });
+    }
+});
+
+const auth = require('./authenticate');
+
+app.get('/profile', auth, (req, res) => {
+    res.status(200).json({
+        status: 'success',
+        message: 'Logged In User Information.',
+        data: {
+            user: {
+                email: req.user.email,
+            },
+        },
+    });
+});
